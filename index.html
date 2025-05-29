@@ -852,5 +852,73 @@
             showStatus('Inicia la cámara trasera, toma una foto o sube una imagen para comenzar', 'success');
         });
     </script>
+    <!-- MODIFICACIÓN INCLUIDA EN init() PARA SELECCIONAR CÁMARA -->
+<script>
+async function init() {
+    if (isWebcamMode && webcam) return;
+
+    try {
+        const cameraChoice = prompt("Selecciona la cámara:\n1. Frontal\n2. Trasera", "2");
+        if (!cameraChoice || (cameraChoice !== "1" && cameraChoice !== "2")) {
+            showStatus("Selección inválida o cancelada.", "error");
+            return;
+        }
+
+        startBtn.disabled = true;
+        uploadBtn.disabled = true;
+        startBtn.textContent = 'Iniciando...';
+        toggleLoading(true);
+
+        await loadModel();
+
+        const flip = cameraChoice === "1"; // flip solo si es frontal
+        webcam = new tmImage.Webcam(300, 300, flip);
+
+        let facingMode = cameraChoice === "2" ? { exact: "environment" } : { exact: "user" };
+
+        try {
+            await webcam.setup({ video: { width: 300, height: 300, facingMode } });
+        } catch (specificError) {
+            console.warn('Modo exacto no disponible, intentando con ideal:', specificError);
+            facingMode = cameraChoice === "2" ? { ideal: "environment" } : { ideal: "user" };
+            await webcam.setup({ video: { width: 300, height: 300, facingMode } });
+        }
+
+        await webcam.play();
+        webcamContainer.innerHTML = '';
+        webcamContainer.appendChild(webcam.canvas);
+
+        labelContainer = document.getElementById("label-container");
+        labelContainer.innerHTML = '';
+        setupPredictionContainers();
+
+        webcamContainer.style.display = 'inline-block';
+        imageContainer.className = 'image-container';
+        webcamSection.className = 'webcam-section active';
+
+        toggleLoading(false);
+        toggleResetButton(true);
+        togglePhotoButton(true);
+
+        showStatus(`\u2714\ufe0f ${cameraChoice === "2" ? "C\u00e1mara Trasera" : "C\u00e1mara Frontal"} Activa`);
+
+        startBtn.textContent = `\u2714\ufe0f ${cameraChoice === "2" ? "C\u00e1mara Trasera" : "C\u00e1mara Frontal"} Activa`;
+        uploadBtn.disabled = false;
+        isWebcamMode = true;
+        isInitialized = true;
+
+        if (animationId) cancelAnimationFrame(animationId);
+        loop();
+    } catch (error) {
+        console.error('Error al inicializar:', error);
+        showStatus('Error al inicializar la c\u00e1mara. Verifica los permisos.', 'error');
+        startBtn.disabled = false;
+        uploadBtn.disabled = false;
+        startBtn.textContent = '🚀 Iniciar Cámara';
+        toggleLoading(false);
+    }
+}
+</script>
+
 </body>
 </html>
