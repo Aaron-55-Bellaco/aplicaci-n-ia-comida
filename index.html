@@ -492,23 +492,34 @@
                 // Cargar modelo si no está cargado
                 await loadModel();
 
-                // Configurar webcam (preferir cámara trasera en móviles)
-                const flip = true; // Siempre voltear para mejor experiencia
+                // Configurar webcam - NO voltear para cámara trasera
+                const flip = false; // No voltear para cámara trasera
                 
                 webcam = new tmImage.Webcam(300, 300, flip);
                 
-                // Intentar usar cámara trasera si está disponible
+                // Forzar uso de cámara trasera
                 try {
                     await webcam.setup({
                         video: {
                             width: 300,
                             height: 300,
-                            facingMode: { ideal: "environment" } // Prefiere cámara trasera pero permite frontal
+                            facingMode: { exact: "environment" } // Forzar cámara trasera
                         }
                     });
                 } catch (specificError) {
-                    console.warn('Usando cámara predeterminada:', specificError);
-                    await webcam.setup();
+                    console.warn('Cámara trasera no disponible, intentando con ideal:', specificError);
+                    try {
+                        await webcam.setup({
+                            video: {
+                                width: 300,
+                                height: 300,
+                                facingMode: { ideal: "environment" }
+                            }
+                        });
+                    } catch (fallbackError) {
+                        console.warn('Usando cámara predeterminada:', fallbackError);
+                        await webcam.setup();
+                    }
                 }
                 
                 await webcam.play();
@@ -533,9 +544,9 @@
                 toggleResetButton(true);
                 togglePhotoButton(true);
                 
-                showStatus('¡Cámara iniciada correctamente! 📸');
+                showStatus('¡Cámara trasera iniciada correctamente! 📸');
                 
-                startBtn.textContent = '✅ Cámara Activa';
+                startBtn.textContent = '✅ Cámara Trasera Activa';
                 uploadBtn.disabled = false;
                 isWebcamMode = true;
                 isInitialized = true;
@@ -546,7 +557,11 @@
 
             } catch (error) {
                 console.error('Error al inicializar:', error);
-                showStatus('Error al inicializar la cámara. Verifica los permisos.', 'error');
+                let errorMessage = 'Error al inicializar la cámara. Verifica los permisos.';
+                if (error.name === 'OverconstrainedError' || error.name === 'NotFoundError') {
+                    errorMessage = 'Cámara trasera no disponible. Verifica que tu dispositivo tenga cámara trasera.';
+                }
+                showStatus(errorMessage, 'error');
                 startBtn.disabled = false;
                 uploadBtn.disabled = false;
                 startBtn.textContent = '🚀 Iniciar Cámara';
@@ -579,9 +594,8 @@
                 photoCanvas.width = canvas.width;
                 photoCanvas.height = canvas.height;
                 
-                // Dibujar la imagen (sin voltear para que se vea natural)
-                ctx.scale(-1, 1); // Voltear horizontalmente para foto natural
-                ctx.drawImage(canvas, -canvas.width, 0);
+                // Dibujar la imagen (sin voltear adicional ya que flip=false)
+                ctx.drawImage(canvas, 0, 0);
                 
                 // Convertir a blob
                 photoCanvas.toBlob(async (blob) => {
@@ -835,7 +849,7 @@
 
         // Información al cargar la página
         document.addEventListener('DOMContentLoaded', () => {
-            showStatus('Inicia la cámara, toma una foto o sube una imagen para comenzar', 'success');
+            showStatus('Inicia la cámara trasera, toma una foto o sube una imagen para comenzar', 'success');
         });
     </script>
 </body>
