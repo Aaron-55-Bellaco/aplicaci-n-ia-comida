@@ -56,7 +56,7 @@
             flex-wrap: wrap;
         }
 
-        .start-btn, .upload-btn {
+        .start-btn, .upload-btn, .reset-btn, .rear-camera-btn {
             background: linear-gradient(45deg, #ff6b6b, #ee5a24);
             color: white;
             border: none;
@@ -75,7 +75,22 @@
             box-shadow: 0 4px 15px rgba(78, 205, 196, 0.3);
         }
 
-        .start-btn:hover, .upload-btn:hover {
+        .reset-btn {
+            background: linear-gradient(45deg, #fd79a8, #e84393);
+            box-shadow: 0 4px 15px rgba(253, 121, 168, 0.3);
+            display: none;
+        }
+
+        .rear-camera-btn {
+            background: linear-gradient(45deg, #a29bfe, #6c5ce7);
+            box-shadow: 0 4px 15px rgba(162, 155, 254, 0.3);
+        }
+
+        .reset-btn.active {
+            display: inline-block;
+        }
+
+        .start-btn:hover, .upload-btn:hover, .reset-btn:hover, .rear-camera-btn:hover {
             transform: translateY(-2px);
         }
 
@@ -87,7 +102,15 @@
             box-shadow: 0 6px 20px rgba(78, 205, 196, 0.4);
         }
 
-        .start-btn:disabled, .upload-btn:disabled {
+        .reset-btn:hover {
+            box-shadow: 0 6px 20px rgba(253, 121, 168, 0.4);
+        }
+
+        .rear-camera-btn:hover {
+            box-shadow: 0 6px 20px rgba(162, 155, 254, 0.4);
+        }
+
+        .start-btn:disabled, .upload-btn:disabled, .reset-btn:disabled, .rear-camera-btn:disabled {
             background: #ccc;
             cursor: not-allowed;
             transform: none;
@@ -239,7 +262,7 @@
                 align-items: center;
             }
             
-            .start-btn, .upload-btn {
+            .start-btn, .upload-btn, .reset-btn, .rear-camera-btn {
                 width: 200px;
                 margin: 5px 0;
             }
@@ -262,12 +285,20 @@
         <p class="subtitle">Detecta pizzas y hamburguesas usando inteligencia artificial</p>
         
         <div class="button-group">
-            <button id="start-btn" class="start-btn" onclick="init()">
-                🚀 Iniciar Cámara
+            <button id="start-btn" class="start-btn" onclick="init(false)">
+                🚀 Cámara Frontal
+            </button>
+            
+            <button id="rear-camera-btn" class="rear-camera-btn" onclick="init(true)">
+                📱 Cámara Trasera
             </button>
             
             <button id="upload-btn" class="upload-btn" onclick="triggerFileUpload()">
                 📷 Subir Foto
+            </button>
+            
+            <button id="reset-btn" class="reset-btn" onclick="resetApp()">
+                🔄 Reiniciar
             </button>
         </div>
         
@@ -302,13 +333,16 @@
 
         // Elementos del DOM
         const startBtn = document.getElementById('start-btn');
+        const rearCameraBtn = document.getElementById('rear-camera-btn');
         const uploadBtn = document.getElementById('upload-btn');
+        const resetBtn = document.getElementById('reset-btn');
         const webcamSection = document.getElementById('webcam-section');
         const statusDiv = document.getElementById('status');
         const loadingDiv = document.getElementById('loading');
         const webcamContainer = document.getElementById('webcam-container');
         const imageContainer = document.getElementById('image-container');
         const uploadedImage = document.getElementById('uploaded-image');
+        const fileInput = document.getElementById('file-input');
 
         // Función para mostrar estado
         function showStatus(message, type = 'success') {
@@ -324,6 +358,58 @@
         // Función para mostrar/ocultar loading
         function toggleLoading(show) {
             loadingDiv.className = show ? 'loading active' : 'loading';
+        }
+
+        // Función para mostrar/ocultar botón de reset
+        function toggleResetButton(show) {
+            resetBtn.className = show ? 'reset-btn active' : 'reset-btn';
+        }
+
+        // Función para resetear la aplicación
+        function resetApp() {
+            // Detener webcam si está activa
+            if (webcam && isWebcamMode) {
+                if (animationId) cancelAnimationFrame(animationId);
+                webcam.stop();
+                webcam = null;
+            }
+
+            // Limpiar elementos visuales
+            webcamContainer.innerHTML = '';
+            webcamContainer.style.display = 'inline-block';
+            imageContainer.className = 'image-container';
+            uploadedImage.src = '';
+            
+            // Limpiar resultados
+            if (labelContainer) {
+                labelContainer.innerHTML = '';
+            }
+
+            // Ocultar sección de webcam
+            webcamSection.className = 'webcam-section';
+
+            // Resetear estados
+            isWebcamMode = false;
+            isInitialized = false;
+            predictions = [];
+
+            // Resetear botones
+            startBtn.disabled = false;
+            rearCameraBtn.disabled = false;
+            uploadBtn.disabled = false;
+            startBtn.textContent = '🚀 Cámara Frontal';
+            rearCameraBtn.textContent = '📱 Cámara Trasera';
+            uploadBtn.textContent = '📷 Subir Foto';
+            toggleResetButton(false);
+
+            // Limpiar input de archivo
+            fileInput.value = '';
+
+            // Ocultar loading y status
+            toggleLoading(false);
+            statusDiv.style.display = 'none';
+
+            showStatus('Aplicación reiniciada correctamente 🔄', 'success');
         }
 
         // Cargar modelo una sola vez
@@ -358,22 +444,48 @@
         }
         
         // Inicializar la aplicación con cámara
-        async function init() {
+        async function init(useRearCamera = false) {
             if (isWebcamMode && webcam) return;
             
             try {
                 startBtn.disabled = true;
+                rearCameraBtn.disabled = true;
                 uploadBtn.disabled = true;
-                startBtn.textContent = 'Iniciando...';
+                
+                if (useRearCamera) {
+                    rearCameraBtn.textContent = 'Iniciando...';
+                } else {
+                    startBtn.textContent = 'Iniciando...';
+                }
+                
                 toggleLoading(true);
 
                 // Cargar modelo si no está cargado
                 await loadModel();
 
-                // Configurar webcam
-                const flip = true;
+                // Configurar webcam con especificaciones de cámara
+                const flip = !useRearCamera; // Solo voltear imagen para cámara frontal
+                
+                // Configurar constraints para seleccionar cámara
+                const constraints = {
+                    video: {
+                        width: 300,
+                        height: 300,
+                        facingMode: useRearCamera ? { exact: "environment" } : "user"
+                    }
+                };
+
                 webcam = new tmImage.Webcam(300, 300, flip);
-                await webcam.setup();
+                
+                // Intentar configurar con la cámara específica
+                try {
+                    await webcam.setup(constraints);
+                } catch (specificError) {
+                    console.warn('No se pudo usar la cámara específica, usando la predeterminada:', specificError);
+                    // Fallback a configuración básica
+                    await webcam.setup();
+                }
+                
                 await webcam.play();
 
                 // Limpiar contenedor de webcam y agregar canvas
@@ -393,9 +505,19 @@
                 // Mostrar interfaz
                 webcamSection.className = 'webcam-section active';
                 toggleLoading(false);
-                showStatus('¡Cámara iniciada correctamente! 📸');
+                toggleResetButton(true);
                 
-                startBtn.textContent = '✅ Cámara Activa';
+                const cameraType = useRearCamera ? 'trasera' : 'frontal';
+                showStatus(`¡Cámara ${cameraType} iniciada correctamente! 📸`);
+                
+                if (useRearCamera) {
+                    rearCameraBtn.textContent = '✅ Cámara Trasera';
+                    startBtn.textContent = '🚀 Cámara Frontal';
+                } else {
+                    startBtn.textContent = '✅ Cámara Frontal';
+                    rearCameraBtn.textContent = '📱 Cámara Trasera';
+                }
+                
                 uploadBtn.disabled = false;
                 isWebcamMode = true;
                 isInitialized = true;
@@ -406,10 +528,16 @@
 
             } catch (error) {
                 console.error('Error al inicializar:', error);
-                showStatus('Error al inicializar la cámara. Verifica los permisos.', 'error');
+                const errorMessage = useRearCamera && error.name === 'OverconstrainedError' 
+                    ? 'Cámara trasera no disponible. Intenta con la frontal.' 
+                    : 'Error al inicializar la cámara. Verifica los permisos.';
+                
+                showStatus(errorMessage, 'error');
                 startBtn.disabled = false;
+                rearCameraBtn.disabled = false;
                 uploadBtn.disabled = false;
-                startBtn.textContent = '🚀 Iniciar Cámara';
+                startBtn.textContent = '🚀 Cámara Frontal';
+                rearCameraBtn.textContent = '📱 Cámara Trasera';
                 toggleLoading(false);
             }
         }
@@ -433,6 +561,7 @@
             try {
                 uploadBtn.disabled = true;
                 startBtn.disabled = true;
+                rearCameraBtn.disabled = true;
                 uploadBtn.textContent = 'Procesando...';
                 toggleLoading(true);
 
@@ -467,12 +596,15 @@
                         await predictImage(uploadedImage);
                         
                         toggleLoading(false);
+                        toggleResetButton(true);
                         showStatus('¡Imagen analizada correctamente! 🖼️');
                         uploadBtn.textContent = '📷 Subir Otra Foto';
                         startBtn.disabled = false;
+                        rearCameraBtn.disabled = false;
                         uploadBtn.disabled = false;
                         isWebcamMode = false;
-                        startBtn.textContent = '🚀 Iniciar Cámara';
+                        startBtn.textContent = '🚀 Cámara Frontal';
+                        rearCameraBtn.textContent = '📱 Cámara Trasera';
                         
                         // Limpiar URL después de un tiempo
                         setTimeout(() => {
@@ -495,6 +627,7 @@
                     showStatus('Error al cargar la imagen. Verifica que sea un formato válido.', 'error');
                     uploadBtn.disabled = false;
                     startBtn.disabled = false;
+                    rearCameraBtn.disabled = false;
                     uploadBtn.textContent = '📷 Subir Foto';
                     toggleLoading(false);
                 };
@@ -504,6 +637,7 @@
                 showStatus('Error al procesar la imagen: ' + error.message, 'error');
                 uploadBtn.disabled = false;
                 startBtn.disabled = false;
+                rearCameraBtn.disabled = false;
                 uploadBtn.textContent = '📷 Subir Foto';
                 toggleLoading(false);
             }
@@ -594,7 +728,7 @@
 
         // Información al cargar la página
         document.addEventListener('DOMContentLoaded', () => {
-            showStatus('Haz clic en "Iniciar Cámara" para comenzar', 'success');
+            showStatus('Elige una cámara o sube una foto para comenzar', 'success');
         });
     </script>
 </body>
